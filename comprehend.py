@@ -137,7 +137,7 @@ def main(args):
     questions = readQuestions(args.questionsFile, args.skipHeader)
     with open(args.outFile, 'w') as fp:
         for row in toCsvOutput(toEntities(questions, api, errors)):
-            print(','.join(['"%s"' % item.replace('"', '') for item in row]), file=fp)
+            print(','.join(['"%s"' % item.replace('"', '').encode('utf8') for item in row]), file=fp)
     api.summary()
 
 
