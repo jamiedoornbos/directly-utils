@@ -36,12 +36,14 @@ def toBatches(seq, size):
         yield batch
 
 
-def readQuestions(questionsFile):
+def readQuestions(questionsFile, skipHeader):
     with open(questionsFile, 'rU') as fp:
         reader = csv.reader(fp)
         linenum = 0
         try:
             for linenum, row in enumerate(reader):
+                if linenum == 0 and skipHeader:
+                    continue
                 yield Question(linenum, row)
         except csv.Error:
             print("Error reading csv file on row", linenum + 1)
@@ -123,6 +125,7 @@ def setupArgs():
     args.add_argument(
         'outFile', metavar='ENTITIES', help='File to write output (will be overwritten)')
     args.add_argument('-cache', help='Use a cache', default=None)
+    args.add_argument('-skipHeader', help='Skip the header row', default=False, action='store_true')
     return args
 
 
@@ -131,7 +134,7 @@ def main(args):
     if args.cache:
         api = CachedApi(args.cache, api)
     errors = []
-    questions = readQuestions(args.questionsFile)
+    questions = readQuestions(args.questionsFile, args.skipHeader)
     with open(args.outFile, 'w') as fp:
         for row in toCsvOutput(toEntities(questions, api, errors)):
             print(','.join(['"%s"' % item.replace('"', '') for item in row]), file=fp)
