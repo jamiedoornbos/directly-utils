@@ -15,6 +15,16 @@ ENTITY_TYPES = (
     'OTHER').split(' | ')
 
 
+class Question(object):
+    def __init__(self, linenum, row):
+        self.linenum = linenum
+        self.id, \
+            self.queue_name, \
+            self.ticket_source, \
+            self.subject, \
+            self.text = row
+
+
 def toBatches(seq, size):
     batch = []
     for item in seq:
@@ -29,8 +39,13 @@ def toBatches(seq, size):
 def readQuestions(questionsFile):
     with open(questionsFile) as fp:
         reader = csv.reader(fp)
-        for row in reader:
-            yield row
+        linenum = 0
+        try:
+            for linenum, row in enumerate(reader):
+                yield Question(linenum, row)
+        except csv.Error:
+            print("Error reading csv file on row", linenum + 1)
+            raise
 
 
 def toEntities(questions, api, errors):
@@ -43,13 +58,13 @@ def toEntities(questions, api, errors):
 
 def toCsvOutput(entities):
     yield ['Question Id'] + ENTITY_TYPES
-    for (questionId, questionText), entities in entities:
+    for question, entities in entities:
         coll = collections.defaultdict(list)
         for entity in entities:
             coll[entity['Type']].append(entity['Text'])
         if len(coll) == 0:
             continue
-        yield [questionId] + [' + '.join(coll.get(e, [])) for e in ENTITY_TYPES]
+        yield [question.id] + [' + '.join(coll.get(e, [])) for e in ENTITY_TYPES]
 
 
 class BotoApi(object):
@@ -76,7 +91,7 @@ class CachedApi(object):
         self.count = 0
 
     def __call__(self, questions):
-        text = ' '.join(text for _id, text in questions)
+        text = ' '.join(question.text for question in questions)
         cacheFile = os.path.join(self.dir, hashlib.sha256(text).hexdigest())
         created = False
         if not os.path.exists(cacheFile):
