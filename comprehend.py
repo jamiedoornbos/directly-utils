@@ -14,6 +14,8 @@ ENTITY_TYPES = (
     'PERSON | LOCATION | ORGANIZATION | COMMERCIAL_ITEM | EVENT | DATE | QUANTITY | TITLE | ' +
     'OTHER').split(' | ')
 
+MAX_TEXT_LENGTH = 5000
+
 
 class Question(object):
     def __init__(self, linenum, row):
@@ -23,6 +25,20 @@ class Question(object):
             self.ticket_source, \
             self.subject, \
             self.text = row
+
+    def truncate(self):
+        text = self.text
+        unicode_text = self.text.decode('utf8')
+        if len(text) > MAX_TEXT_LENGTH:
+            while len(text) > MAX_TEXT_LENGTH:
+                unicode_text = unicode_text[:-1]
+                text = unicode_text.encode('utf8')
+            print(
+                "Truncating question", self.id, "on line", self.linenum,
+                "from binary length", len(self.text),
+                "to binary length", len(text),
+                "and unicode length", len(unicode_text))
+        return unicode_text
 
 
 def toBatches(seq, size):
@@ -91,7 +107,7 @@ class BotoApi(object):
 class DetectEnglishEntities(BotoApi):
     def _invoke(self, questions):
         return self.client.batch_detect_entities(
-            TextList=[question.text for question in questions], LanguageCode='en')
+            TextList=[question.truncate() for question in questions], LanguageCode='en')
 
 
 class CachedApi(object):
