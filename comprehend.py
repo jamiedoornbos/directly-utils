@@ -60,7 +60,11 @@ def readQuestions(questionsFile, skipHeader):
             for linenum, row in enumerate(reader):
                 if linenum == 0 and skipHeader:
                     continue
-                yield Question(linenum, row)
+                question = Question(linenum, row)
+                if len(question.text) == 0:
+                    print("Skipping empty question on line", question.linenum)
+                    continue
+                yield question
         except csv.Error:
             print("Error reading csv file on row", linenum + 1)
             raise
