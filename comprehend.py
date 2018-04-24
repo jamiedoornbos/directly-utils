@@ -76,14 +76,22 @@ class BotoApi(object):
 
     def __call__(self, questions):
         self.count += 1
-        result = self.client.batch_detect_entities(
-            TextList=[text for _id, text in questions], LanguageCode='en')
+        result = self._invoke(questions)
         if self.count % 100 == 0:
             self.summary()
         return result
 
+    def _invoke(self, questions):
+        raise NotImplementedError()
+
     def summary(self):
         print('Queried {:,} batches'.format(self.count))
+
+
+class DetectEnglishEntities(BotoApi):
+    def _invoke(self, questions):
+        return self.client.batch_detect_entities(
+            TextList=[question.text for question in questions], LanguageCode='en')
 
 
 class CachedApi(object):
@@ -130,7 +138,7 @@ def setupArgs():
 
 
 def main(args):
-    api = BotoApi()
+    api = DetectEnglishEntities()
     if args.cache:
         api = CachedApi(args.cache, api)
     errors = []
