@@ -37,7 +37,7 @@ def toBatches(seq, size):
 
 
 def readQuestions(questionsFile):
-    with open(questionsFile) as fp:
+    with open(questionsFile, 'rU') as fp:
         reader = csv.reader(fp)
         linenum = 0
         try:
