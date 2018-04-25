@@ -1,0 +1,52 @@
+#!/bin/bash -e
+
+# aws-grab-creds
+
+Reset=
+Temp=
+Credentials=~/.aws/credentials
+Backup=$Credentials.backup
+MfaDevice=arn:aws:iam::222336342030:mfa/jdoornbos
+GetSessionTokenOutput=/tmp/aws-temp-creds
+
+get_field() {
+    jq -r .Credentials.$1 $GetSessionTokenOutput
+}
+
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        --reset) Reset=t;;
+        -*) echo "Unrecognized option $1" >&2; exit 1;;
+        **) echo "Unrecognized argument $1" >&2; exit 1;;
+    esac
+done
+
+
+if [ -e "$Backup" ];then
+    cp  "$Backup" "$Credentials"
+    echo "Restored original credentials"
+fi
+
+if [ -z "$Reset" ]; then
+    read -p "Enter token from MFA device: " TokenCode
+    aws sts get-session-token \
+        --serial-number "$MfaDevice" \
+        --token-code "$TokenCode" > $GetSessionTokenOutput
+
+    if [ ! -e "$Backup" ]; then
+        cp  "$Credentials" "$Backup"
+        echo "Created backup of original credentials"
+    fi
+
+
+
+    {
+        echo "[default]"
+        echo "aws_access_key_id = `get_field AccessKeyId`"
+        echo "aws_secret_access_key = `get_field SecretAccessKey`"
+        echo "aws_session_token = `get_field SessionToken`"
+    } > "$Credentials"
+    echo "Replaced $Credentials with temporary values"
+
+fi
