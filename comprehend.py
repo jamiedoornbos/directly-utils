@@ -95,6 +95,12 @@ class DetectEnglishEntities(BotoApi):
             TextList=[question.truncate() for question in questions], LanguageCode='en')
 
 
+class DetectDominantLanguage(BotoApi):
+    def _invoke(self, questions):
+        return self.client.batch_detect_dominant_language(
+            TextList=[question.truncate() for question in questions])
+
+
 class CachedApi(object):
     def __init__(self, dir_, loader):
         self.dir = dir_
@@ -159,8 +165,23 @@ class DetectEntities(Mode):
             yield [question.id] + [' + '.join(coll.get(e, [])) for e in ENTITY_TYPES]
 
 
+class DetectLanguages(Mode):
+    def createApi(self):
+        return DetectDominantLanguage()
+
+    def csvOutput(self, questions):
+        yield ['Question Id', 'Language', 'Score']
+        for question, languages in self.fetchResults(questions, 'Languages'):
+            if len(languages) > 1:
+                print("Question", question.id, "on line", question.linenum,
+                    "has multiple languages:", languages)
+            best = max(languages, key=lambda l: l['Score'])
+            yield [question.id, best['LanguageCode'], str(best['Score'])]
+
+
 MODES = [
     ('detect-entities', DetectEntities),
+    ('detect-languages', DetectLanguages)
 ]
 
 
