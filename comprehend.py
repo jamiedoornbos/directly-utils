@@ -70,25 +70,6 @@ def readQuestions(questionsFile, skipHeader):
             raise
 
 
-def toEntities(questions, api, errors):
-    for batch in toBatches(questions, 25):
-        result = api(batch)
-        errors.extend(result['ErrorList'])
-        for row, item in zip(batch, result['ResultList']):
-            yield row, item['Entities']
-
-
-def toCsvOutput(entities):
-    yield ['Question Id'] + ENTITY_TYPES
-    for question, entities in entities:
-        coll = collections.defaultdict(list)
-        for entity in entities:
-            coll[entity['Type']].append(entity['Text'])
-        if len(coll) == 0:
-            continue
-        yield [question.id] + [' + '.join(coll.get(e, [])) for e in ENTITY_TYPES]
-
-
 class BotoApi(object):
     def __init__(self):
         self.client = boto3.client('comprehend')
@@ -146,8 +127,47 @@ class CachedApi(object):
         self.printCount()
 
 
+class Mode(object):
+    def __init__(self, cache):
+        self.errors = []
+        api = self.createApi()
+        self.api = CachedApi(cache, api) if cache else api
+
+    def fetchResults(self, questions, resultField):
+        for batch in toBatches(questions, 25):
+            result = self.api(batch)
+            self.errors.extend(result['ErrorList'])
+            for row, item in zip(batch, result['ResultList']):
+                yield row, item[resultField]
+
+    def csvOutput(self, questions):
+        raise NotImplementedError()
+
+
+class DetectEntities(Mode):
+    def createApi(self):
+        return DetectEnglishEntities()
+
+    def csvOutput(self, questions):
+        yield ['Question Id'] + ENTITY_TYPES
+        for question, entities in self.fetchResults(questions, 'Entities'):
+            coll = collections.defaultdict(list)
+            for entity in entities:
+                coll[entity['Type']].append(entity['Text'])
+            if len(coll) == 0:
+                continue
+            yield [question.id] + [' + '.join(coll.get(e, [])) for e in ENTITY_TYPES]
+
+
+MODES = [
+    ('detect-entities', DetectEntities),
+]
+
+
 def setupArgs():
     args = argparse.ArgumentParser()
+    args.add_argument(
+        'mode', metavar='MODE', help='Mode to run', choices=(mode[0] for mode in MODES))
     args.add_argument(
         'questionsFile', metavar='QUESTIONS', help='File containing questions, one per line')
     args.add_argument(
@@ -158,15 +178,12 @@ def setupArgs():
 
 
 def main(args):
-    api = DetectEnglishEntities()
-    if args.cache:
-        api = CachedApi(args.cache, api)
-    errors = []
+    mode = dict(MODES)[args.mode](args.cache)
     questions = readQuestions(args.questionsFile, args.skipHeader)
     with open(args.outFile, 'w') as fp:
-        for row in toCsvOutput(toEntities(questions, api, errors)):
+        for row in mode.csvOutput(questions):
             print(','.join(['"%s"' % item.replace('"', '').encode('utf8') for item in row]), file=fp)
-    api.summary()
+    mode.api.summary()
 
 
 if __name__ == '__main__':
