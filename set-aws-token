@@ -1,0 +1,46 @@
+#!/bin/bash
+
+
+if [ -z "$AWS_MFA_DEVICE" ]; then
+    (
+        echo "AWS_MFA_DEVICE not set"
+        echo "Use this:"
+        echo "   export AWS_MFA_DEVICE=arn:aws:iam::###:mfa/..."
+    ) >&2
+    exit 1
+fi
+
+
+if [ $# -ne 1 ]; then
+    (
+        echo "set-aws-token <MFA CODE>"
+        echo
+        echo "Expected MFA code from phone device $AWS_MFA_DEVICE"
+    ) >&2
+    exit 1
+fi
+
+
+# Get the MFA-protected session details
+output=$(
+    aws sts get-session-token \
+        --serial-number $AWS_MFA_DEVICE \
+        --query 'Credentials.[SecretAccessKey,AccessKeyId,SessionToken]' \
+        --profile token \
+        --output text \
+        --token-code $1
+)
+
+# get the aws_secret_access_key
+aws_secret_access_key=$(echo $output | cut -f1 -d ' ')
+
+# get the aws_secret_access_key
+aws_access_key_id=$(echo $output | cut -f2 -d ' ')
+
+# get the aws_secret_access_key
+aws_session_token=$(echo $output | cut -f3 -d ' ')
+
+`aws configure set profile.default.region us-east-1`
+`aws configure set profile.default.aws_access_key_id $aws_access_key_id`
+`aws configure set profile.default.aws_secret_access_key $aws_secret_access_key`
+`aws configure set profile.default.aws_session_token $aws_session_token`
