@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+
+import subprocess
+import os
+import json
+import argparse
+
+
+class LogStream(object):
+    def download_pages(self):
+        raise NotImplementedError()
+
+    def download_events(self):
+        for page in self.download_pages():
+            output = json.loads(page)
+            next_token = output['nextForwardToken']
+            events = output['events']
+            if len(events) == 0:
+                break
+            for event in events:
+                yield event
+
+
+class CloudwatchLogStream(LogStream):
+    def __init__(self, group, stream):
+        self.group = group
+        self.stream = stream
+
+    def download_pages(self):
+        next_token = None
+        cmd = ['aws', 'logs', 'get-log-events']
+        cmd += ['--log-group-name', self.group]
+        cmd += ['--log-stream-name', self.stream]
+        for page in xrange(1, 10**3):
+            page_cmd = list(cmd)
+            if next_token:
+                page_cmd += ['--next-token',  next_token]
+            print 'Downloading page', page
+            print '   ', ' '.join(page_cmd)
+            output = json.loads(subprocess.check_output(page_cmd))
+            next_token = output['nextForwardToken']
+            yield output
+            del output
+
+    def download_events(self):
+        for output in self.download_pages():
+            events = output['events']
+            if len(events) == 0:
+                break
+            for event in events:
+                yield event
+
+
+class LocalLogStream(LogStream):
+    def __init__(self, path):
+        self.path = path
+
+    def exists(self, download=1):
+        path = '%s.%s' % (self.path, download)
+        if not os.path.exists(path):
+            return None
+        return path
+
+    def download_pages(self):
+        download = 1
+        for download in xrange(1, 10**3):
+            path = self.exists(download)
+            if not path:
+                return
+            with open(path) as fp:
+                yield json.loads(fp.read())
+
+
+def args():
+    parser = argparse.ArgumentParser(
+        'Downloads Cloudwatch log events and appends all messages to a local file')
+    parser.add_argument('group', help='AWS log group name')
+    parser.add_argument('stream', help='AWS log stream name')
+    parser.add_argument('output', help='File to write output event messages')
+    return parser
+
+
+def main(args):
+    stream = LocalLogStream(args.stream)
+    if not stream.exists():
+        stream = CloudwatchLogStream(args.group, args.stream)
+
+    with open(args.output, 'w') as fp:
+        try:
+            for event in stream.download_events():
+                fp.write(event['message'])
+                fp.write("\n")
+        except subprocess.CalledProcessError:
+            return
+
+
+if __name__ == '__main__':
+    main(args().parse_args())
