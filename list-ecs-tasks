@@ -1,0 +1,24 @@
+#!/bin/bash -e
+
+die() {
+    echo "$@"
+    exit 1
+}
+
+env=$1
+case "$env" in
+    prod) ;;
+    **) die "Unknown environment $env"
+esac
+
+service=$2
+case "$service" in
+    *ds-prweb|prweb) service=ds-prweb;;
+    *ds-prjob|prjob) service=ds-prjob;;
+    **) echo "Using unknown service $service";;
+esac
+
+aws ecs list-tasks \
+    --service arn:aws:ecs:us-east-1:222336342030:service/$env-$service \
+    --cluster arn:aws:ecs:us-east-1:222336342030:cluster/$env-vpc-ecs | \
+    jq -r '.taskArns[]'

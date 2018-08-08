@@ -1,0 +1,33 @@
+#!/bin/bash -e
+
+here=`dirname $0`
+
+die() {
+    echo "$@"
+    exit 1
+}
+
+env=$1
+case "$env" in
+    prod) ;;
+    **) die "Unknown environment $env"
+esac
+
+path=$2
+case "$path" in
+    *prweb) path=$env-prweb/ds-prweb;;
+    *prjob) path=$env-prjob/ds-prjob;;
+    **) echo "Using unknown service $path";;
+esac
+
+
+output=$3
+mkdir -p "$output"
+
+tasks=(`$here/list-ecs-tasks $1 $2`)
+
+
+for task in "${tasks[@]}"; do
+    log_name=${task##*/}
+    $here/aws-get-all-logs $env-ecs $path/$log_name $output/$log_name
+done
