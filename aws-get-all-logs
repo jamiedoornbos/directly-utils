@@ -31,6 +31,7 @@ class CloudwatchLogStream(LogStream):
         cmd = ['aws', 'logs', 'get-log-events']
         cmd += ['--log-group-name', self.group]
         cmd += ['--log-stream-name', self.stream]
+        cmd += ['--start-from-head']
         for page in xrange(1, 10**3):
             page_cmd = list(cmd)
             if next_token:
