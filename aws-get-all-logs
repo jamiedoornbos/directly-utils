@@ -87,12 +87,9 @@ def main(args):
         stream = CloudwatchLogStream(args.group, args.stream)
 
     with open(args.output, 'w') as fp:
-        try:
-            for event in stream.download_events():
-                fp.write(event['message'])
-                fp.write("\n")
-        except subprocess.CalledProcessError:
-            return
+        for event in stream.download_events():
+            fp.write(event['message'].encode('utf8'))
+            fp.write("\n")
 
 
 if __name__ == '__main__':
