@@ -44,3 +44,5 @@ aws_session_token=$(echo $output | cut -f3 -d ' ')
 `aws configure set profile.default.aws_access_key_id $aws_access_key_id`
 `aws configure set profile.default.aws_secret_access_key $aws_secret_access_key`
 `aws configure set profile.default.aws_session_token $aws_session_token`
+
+echo "export DIRECTLY_OVERRIDES='s3.access_key=$aws_access_key_id s3.secret_key=$aws_secret_access_key s3.session_token=$aws_session_token'"
